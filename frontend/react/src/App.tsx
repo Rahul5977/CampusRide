@@ -1,35 +1,41 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+/* -----------------------------------------------------------------------
+ * App.tsx — Root component with React Router v6 setup.
+ *
+ * Route structure:
+ *   /              → LoginPage (public)
+ *   /dashboard     → DashboardPage (protected — also handles OAuth callback)
+ *   /my-rides      → MyRidesPage (protected)
+ *   *              → redirect to /
+ * ----------------------------------------------------------------------- */
 
-function App() {
-  const [count, setCount] = useState(0)
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "@/context/AuthContext";
+import { ToastProvider } from "@/context/ToastContext";
+import LoginPage from "@/pages/LoginPage";
+import DashboardPage from "@/pages/DashboardPage";
+import MyRidesPage from "@/pages/MyRidesPage";
+import ProtectedLayout from "@/layouts/ProtectedLayout";
 
+export default function App() {
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    <BrowserRouter>
+      <AuthProvider>
+        <ToastProvider>
+          <Routes>
+            {/* Public */}
+            <Route path="/" element={<LoginPage />} />
 
-export default App
+            {/* Protected — all children share Navbar + auth guard */}
+            <Route element={<ProtectedLayout />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/my-rides" element={<MyRidesPage />} />
+            </Route>
+
+            {/* Catch-all */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </ToastProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}
