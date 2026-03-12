@@ -57,4 +57,4 @@ const groupSchema = new mongoose.Schema(
 // Ensures rapid searching during high-traffic spikes
 groupSchema.index({ destination: 1, departureDate: 1, status: 1 });
 
-module.exports = mongoose.model("Group", groupSchema);
+export default mongoose.model("Group", groupSchema);

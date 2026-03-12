@@ -42,5 +42,52 @@ const joinGroup = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+const createGroup = async (req, res) => {
+  try {
+    const newGroup = await Group.create({
+      ...req.body,
+      creator: req.user.id,
+      members: [req.user.id],
+      currentMembers: 1,
+    });
+    res.status(201).json({ success: true, group: newGroup });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error creating group" });
+  }
+};
 
-export { joinGroup };
+const getOpenGroups = async (req, res) => {
+  try {
+    const groups = await Group.find({
+      status: "Open",
+      departureDate: { $gte: new Date() },
+    })
+      .populate("creator", "name avatar")
+      .sort({ departureDate: 1 });
+
+    res.status(200).json({ success: true, groups });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error fetching groups" });
+  }
+};
+
+const deleteGroup = async (req, res) => {
+  try {
+    const group = await Group.findOneAndDelete({
+      _id: req.params.groupId,
+      creator: req.user.id,
+    });
+    if (!group)
+      return res
+        .status(404)
+        .json({ success: false, message: "Group not found or unauthorized" });
+
+    res
+      .status(200)
+      .json({ success: true, message: "Group cancelled successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error deleting group" });
+  }
+};
+
+export { joinGroup, createGroup, getOpenGroups, deleteGroup };
