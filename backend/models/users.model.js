@@ -11,10 +11,10 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
-    googleId: { type: String, required: true, unique: true }, //OAuth
+    googleId: { type: String, required: true, unique: true }, // OAuth
     avatar: { type: String },
     phone: { type: String },
-    gender: { type: String, enum: ["Male", "Female", "Other"], required: true },
+    gender: { type: String, enum: ["Male", "Female", "Other"] }, // Collected after OAuth sign-up
     hostel: {
       type: String,
       enum: [
@@ -24,10 +24,10 @@ const userSchema = new mongoose.Schema(
         "Shivnath (MSH)",
         "Day Scholar",
       ],
-      required: true,
+      // Collected after OAuth sign-up
     },
   },
   { timestamps: true },
 );
 
-module.exports = mongoose.model("User", userSchema);
+export default mongoose.model("User", userSchema);

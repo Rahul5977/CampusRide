@@ -1,10 +1,9 @@
 import mongoose from "mongoose";
-import objId from "mongoose.schema.Types.ObjectId";
 
 const groupSchema = new mongoose.Schema(
   {
     creator: {
-      type: objId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
