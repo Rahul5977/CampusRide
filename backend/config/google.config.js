@@ -18,13 +18,14 @@
  */
 
 import { OAuth2Client } from "google-auth-library";
+import "dotenv/config"; 
 
 const oAuth2Client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_CALLBACK_URL, // e.g. http://localhost:5000/api/auth/google/callback
+  process.env.GOOGLE_CALLBACK_URL,
 );
-
+console.log("Google OAuth2 Client configured with callback URL:", process.env.GOOGLE_CALLBACK_URL);
 /**
  * Generate the Google consent screen URL.
  *

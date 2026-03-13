@@ -5,7 +5,7 @@
  * Also reads ?error= from the URL to display auth failure messages.
  * ----------------------------------------------------------------------- */
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Car, ArrowRight, ShieldCheck, Clock, Users } from "lucide-react";
@@ -16,7 +16,8 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   // Read error from URL (set by the backend redirect on auth failure)
-  const error = searchParams.get("error");
+  // Use useMemo to avoid setState in effect pattern
+  const error = useMemo(() => searchParams.get("error"), [searchParams]);
 
   // If there's already a valid session, bounce to dashboard
   useEffect(() => {

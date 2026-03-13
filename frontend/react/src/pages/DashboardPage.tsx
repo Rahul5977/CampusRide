@@ -29,17 +29,22 @@ const DESTINATIONS: (Destination | "All")[] = [
 export default function DashboardPage() {
   const { fetchUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [tokenProcessed, setTokenProcessed] = useState(false);
 
   // ---- OAuth callback token extraction ----
   useEffect(() => {
     const token = searchParams.get("token");
-    if (token) {
+    if (token && !tokenProcessed) {
       localStorage.setItem("ct_token", token);
       // Strip the token from the URL to prevent leakage via Referer header
       setSearchParams({}, { replace: true });
       fetchUser();
+      setTokenProcessed(true);
+    } else if (!token && !tokenProcessed) {
+      // No token in URL, mark as processed
+      setTokenProcessed(true);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchParams, tokenProcessed, setSearchParams, fetchUser]);
 
   // ---- Filter state ----
   const [filterDest, setFilterDest] = useState<Destination | "All">("All");
