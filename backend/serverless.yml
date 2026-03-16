@@ -1,0 +1,26 @@
+# backend/serverless.yml
+
+service: campus-transit-api # The name of your project in AWS
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ap-south-1 # Mumbai region (closest to Chhattisgarh for lowest latency)
+  stage: dev
+  memorySize: 512 # 512MB is plenty for an Express app
+  timeout: 10 # If a request takes longer than 10 seconds, timeout
+  environment:
+    # We pass the environment variables from your local .env to AWS here
+    MONGO_URL: ${env:MONGO_URL}
+    FRONTEND_URL: ${env:FRONTEND_URL}
+
+functions:
+  api:
+    handler: index.handler # Points to the "export const handler" in your index.js
+    events:
+      - httpApi:
+          path: '*' # Catch all routes (e.g., /api/groups, /api/auth)
+          method: '*' # Catch all methods (GET, POST, PUT, DELETE)
+
+plugins:
+  - serverless-dotenv-plugin # This plugin automatically loads your local .env file
