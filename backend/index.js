@@ -45,36 +45,62 @@ app.use(
 app.use(express.json({ limit: "1mb" }));
 
 // ---------------------------------------------------------------------------
-// Serverless-safe MongoDB connection (survives Lambda freeze / warm reuse)
+// Serverless-safe MongoDB connection (Lambda freeze + concurrent requests)
 // ---------------------------------------------------------------------------
-/** Persists across warm Lambda invocations within the same container. */
+/** Mirrors mongoose default connection readyState === 1. */
 let isConnected = false;
 
-const connectDB = async () => {
-  // Clear stale flag when the driver is not connected (e.g. Lambda froze an idle socket).
-  if (mongoose.connection.readyState !== 1) {
-    isConnected = false;
-  }
+/**
+ * In-flight connect promise — prevents concurrent `mongoose.connect()` calls.
+ * Parallel middleware (same cold start or burst) caused ReplicaSetNoPrimary / 500s.
+ */
+let connectPromise = null;
 
-  if (isConnected) {
+const connectDB = async () => {
+  if (mongoose.connection.readyState === 1) {
+    isConnected = true;
     console.log("Reusing existing connection");
     return;
   }
 
-  try {
-    console.log("=> Creating new database connection...");
-    await mongoose.connect(process.env.MONGO_URL, {
-      serverSelectionTimeoutMS: 5000,
-      maxPoolSize: 10,
-      socketTimeoutMS: 45000,
-    });
-    isConnected = mongoose.connections[0].readyState === 1;
-    console.log("✅ Connected to MongoDB");
-  } catch (err) {
-    console.error("❌ MongoDB connection error:", err);
-    isConnected = false;
-    throw err;
+  isConnected = false;
+
+  if (connectPromise) {
+    await connectPromise;
+    if (mongoose.connection.readyState === 1) {
+      isConnected = true;
+      console.log("Reusing existing connection");
+      return;
+    }
   }
+
+  connectPromise = (async () => {
+    try {
+      const rs = mongoose.connection.readyState;
+      if (rs !== 0) {
+        await mongoose.disconnect().catch(() => {});
+      }
+
+      console.log("=> Creating new database connection...");
+      await mongoose.connect(process.env.MONGO_URL, {
+        serverSelectionTimeoutMS: 5000,
+        maxPoolSize: 10,
+        socketTimeoutMS: 45000,
+      });
+      isConnected = mongoose.connections[0].readyState === 1;
+      if (isConnected) {
+        console.log("✅ Connected to MongoDB");
+      }
+    } catch (err) {
+      console.error("❌ MongoDB connection error:", err);
+      isConnected = false;
+      throw err;
+    } finally {
+      connectPromise = null;
+    }
+  })();
+
+  await connectPromise;
 };
 
 // Database Middleware: Ensures DB is connected before hitting any route
