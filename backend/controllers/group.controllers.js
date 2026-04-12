@@ -90,4 +90,41 @@ const deleteGroup = async (req, res) => {
   }
 };
 
-export { joinGroup, createGroup, getOpenGroups, deleteGroup };
+const leaveGroup = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user.id;
+
+    const updatedGroup = await Group.findOneAndUpdate(
+      {
+        _id: groupId,
+        members: userId, // User must be in the group to leave
+        status: { $in: ["Open", "Full"] }, // Can only leave if group is not departed or cancelled
+      },
+      {
+        $inc: { currentMembers: -1 }, // Atomically decrement the count by 1
+        $pull: { members: userId }, // Atomically remove the user ID from the array
+        status: "Open", // Reopen the group if it was full
+      },
+      { new: true }, // Returns the document AFTER the update is applied
+    );
+
+    if (!updatedGroup) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Failed to leave. You are either not in this cab, or it has already departed/cancelled.",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Successfully left the group.",
+    });
+  } catch (error) {
+    console.error("Leave Group Error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+export { joinGroup, createGroup, getOpenGroups, deleteGroup, leaveGroup };
