@@ -50,7 +50,20 @@ export type GroupStatus =
   | "Completed"
   | "Cancelled";
 
-export type MemberRef = string | Pick<User, "_id" | "name" | "avatar">;
+export type MemberRef =
+  | string
+  | Pick<
+      User,
+      | "_id"
+      | "name"
+      | "avatar"
+      | "email"
+      | "phone"
+      | "gender"
+      | "hostel"
+      | "year"
+      | "branch"
+    >;
 
 export interface PendingRequest {
   userId: MemberRef;
@@ -60,7 +73,20 @@ export interface PendingRequest {
 
 export interface Group {
   _id: string;
-  creator: Pick<User, "_id" | "name" | "avatar"> | string;
+  creator:
+    | Pick<
+        User,
+        | "_id"
+        | "name"
+        | "avatar"
+        | "email"
+        | "phone"
+        | "gender"
+        | "hostel"
+        | "year"
+        | "branch"
+      >
+    | string;
   travelPlanId?: string;
   destination: Destination;
   /** Present on groups created with the new API; optional for older documents. */

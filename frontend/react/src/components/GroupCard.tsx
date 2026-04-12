@@ -1,16 +1,18 @@
 /* -----------------------------------------------------------------------
- * GroupCard — displays a single ride group.
- * Join flow: request → creator approves. Creator can manage pending requests.
+ * GroupCard — rich ride card: status, host, members, schedule, join flow.
  * ----------------------------------------------------------------------- */
 
 import { useState, useEffect, useCallback } from "react";
-import type { Group, User, PendingRequest } from "@/types";
+import type { Group, User, PendingRequest, MemberRef } from "@/types";
 import {
   formatDate,
   formatTime,
+  formatDateTime,
   membersContain,
   pendingRequestForUser,
   memberUserId,
+  creatorIdFromGroup,
+  groupStatusBadgeClass,
 } from "@/lib/utils";
 import {
   MapPin,
@@ -24,8 +26,14 @@ import {
   ChevronDown,
   ChevronUp,
   UserPlus,
+  UserRound,
   Check,
   X,
+  Phone,
+  Building2,
+  GraduationCap,
+  BookOpen,
+  Hash,
 } from "lucide-react";
 import api from "@/lib/api";
 import { useToast } from "@/context/ToastContext";
@@ -45,12 +53,23 @@ const destinationEmoji: Record<string, string> = {
 function displayNameForPending(p: PendingRequest): string {
   const u = p.userId;
   if (typeof u === "object" && u?.name) return u.name;
-  if (typeof u === "string") return `User ${u.slice(-6)}`;
+  if (typeof u === "string") return `User …${u.slice(-6)}`;
   return "User";
 }
 
 function pendingUserId(p: PendingRequest): string {
   return memberUserId(p.userId);
+}
+
+function memberDisplayName(m: MemberRef): string {
+  if (typeof m === "object" && m?.name) return m.name;
+  if (typeof m === "string") return `…${m.slice(-6)}`;
+  return "?";
+}
+
+function memberAvatar(m: MemberRef): string | undefined {
+  if (typeof m === "object" && m?.avatar) return m.avatar;
+  return undefined;
 }
 
 export default function GroupCard({ group, onJoined }: GroupCardProps) {
@@ -62,14 +81,28 @@ export default function GroupCard({ group, onJoined }: GroupCardProps) {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const creator =
+  const creatorObj =
     typeof group.creator === "object"
-      ? (group.creator as Pick<User, "_id" | "name" | "avatar">)
+      ? (group.creator as Pick<
+          User,
+          | "_id"
+          | "name"
+          | "avatar"
+          | "email"
+          | "phone"
+          | "gender"
+          | "hostel"
+          | "year"
+          | "branch"
+        >)
       : null;
 
-  const isCreator = !!(user && creator?._id === user._id);
+  const hostId = creatorIdFromGroup(group.creator);
+  const isCreator = !!(user && hostId && hostId === user._id);
   const isMember = user ? membersContain(group.members, user._id) : false;
-  const hasPending = user ? pendingRequestForUser(group.pendingRequests, user._id) : false;
+  const hasPending = user
+    ? pendingRequestForUser(group.pendingRequests, user._id)
+    : false;
   const isFull = group.currentMembers >= group.capacity;
   const canRequest =
     user &&
@@ -163,40 +196,61 @@ export default function GroupCard({ group, onJoined }: GroupCardProps) {
 
   const seatsFilled = group.currentMembers;
   const totalSeats = group.capacity;
+  const members = group.members ?? [];
 
   return (
-    <div className="group rounded-2xl border border-border bg-surface p-4 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div>
-          <p className="text-lg font-semibold text-gray-900 flex items-center gap-1.5">
-            <span>{destinationEmoji[group.destination] ?? "📍"}</span>
-            {group.destination}
-          </p>
-          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-            <span>by</span>
-            {creator?.avatar && (
+    <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm hover:shadow-md transition-shadow space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <p className="text-lg font-semibold text-gray-900 flex items-center gap-1.5">
+              <span>{destinationEmoji[group.destination] ?? "📍"}</span>
+              {group.destination}
+            </p>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${groupStatusBadgeClass(group.status)}`}
+            >
+              {group.status}
+            </span>
+            {pendingCount > 0 && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+                {pendingCount} pending
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 flex items-center gap-1 flex-wrap">
+            <span>Host</span>
+            {creatorObj?.avatar && (
               <img
-                src={creator.avatar}
+                src={creatorObj.avatar}
                 alt=""
                 className="h-4 w-4 rounded-full inline"
                 referrerPolicy="no-referrer"
               />
             )}
             <span className="font-medium text-gray-700">
-              {creator?.name ?? "Unknown"}
+              {creatorObj?.name ?? "Unknown"}
             </span>
+            {creatorObj?.email && (
+              <span className="text-gray-400">· {creatorObj.email}</span>
+            )}
           </p>
-          {(group.transportType || group.trainNumber || group.trainName) && (
-            <p className="text-xs text-gray-400 mt-1">
-              {group.transportType ?? "Train"}
-              {group.trainNumber ? ` · ${group.trainNumber}` : ""}
-              {group.trainName ? ` · ${group.trainName}` : ""}
+          {(group.transportType ||
+            group.trainNumber ||
+            group.trainName ||
+            group.flightNumber) && (
+            <p className="text-xs text-gray-500 mt-1 flex items-center gap-1 flex-wrap">
+              <Train size={12} className="shrink-0 text-brand" />
+              <span>{group.transportType ?? "Train"}</span>
+              {group.trainNumber && <span>#{group.trainNumber}</span>}
+              {group.trainName && <span>· {group.trainName}</span>}
+              {group.flightNumber && <span>· Flight {group.flightNumber}</span>}
             </p>
           )}
         </div>
 
         <div
-          className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+          className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold shrink-0 ${
             isFull
               ? "bg-red-100 text-red-700"
               : seatsFilled >= totalSeats - 1
@@ -209,12 +263,89 @@ export default function GroupCard({ group, onJoined }: GroupCardProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-gray-600 mb-2">
+      {creatorObj &&
+        (creatorObj.phone ||
+          creatorObj.gender ||
+          creatorObj.hostel ||
+          creatorObj.year ||
+          creatorObj.branch) && (
+          <div className="rounded-xl bg-gray-50 border border-border/60 px-3 py-2 text-xs text-gray-600 space-y-1">
+            <p className="font-semibold text-gray-500 uppercase tracking-wide text-[10px]">
+              Host profile
+            </p>
+            <div className="grid gap-1 sm:grid-cols-2">
+              {creatorObj.phone && (
+                <p className="flex items-center gap-1.5">
+                  <Phone size={12} className="text-brand shrink-0" />
+                  {creatorObj.phone}
+                </p>
+              )}
+              {creatorObj.gender && (
+                <p className="flex items-center gap-1.5">
+                  <UserRound size={12} className="text-brand shrink-0" />
+                  {creatorObj.gender}
+                </p>
+              )}
+              {creatorObj.hostel && (
+                <p className="flex items-center gap-1.5">
+                  <Building2 size={12} className="text-brand shrink-0" />
+                  {creatorObj.hostel}
+                </p>
+              )}
+              {creatorObj.year && (
+                <p className="flex items-center gap-1.5">
+                  <GraduationCap size={12} className="text-brand shrink-0" />
+                  {creatorObj.year}
+                </p>
+              )}
+              {creatorObj.branch && (
+                <p className="flex items-center gap-1.5 sm:col-span-2">
+                  <BookOpen size={12} className="text-brand shrink-0" />
+                  {creatorObj.branch}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+      <div className="rounded-xl border border-border/80 bg-white/50 px-3 py-2">
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1">
+          <Users size={12} />
+          Members ({members.length})
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {members.map((m) => {
+            const id = memberUserId(m);
+            return (
+              <div
+                key={id}
+                className="flex items-center gap-1.5 rounded-lg bg-gray-100 pl-1 pr-2 py-1 text-xs text-gray-800 max-w-[160px]"
+              >
+                {memberAvatar(m) ? (
+                  <img
+                    src={memberAvatar(m)}
+                    alt=""
+                    className="h-6 w-6 rounded-md object-cover shrink-0"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="h-6 w-6 rounded-md bg-brand/15 flex items-center justify-center text-[10px] font-bold text-brand shrink-0">
+                    {memberDisplayName(m).charAt(0)}
+                  </div>
+                )}
+                <span className="truncate font-medium">{memberDisplayName(m)}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm text-gray-600">
         <div className="flex items-center gap-1.5">
           <Clock size={14} className="text-brand shrink-0" />
           <span>{formatDate(group.departureDate)}</span>
         </div>
-        <div className="flex items-center gap-1.5 col-span-2 sm:col-span-1">
+        <div className="flex items-center gap-1.5">
           <Clock size={14} className="text-brand shrink-0" />
           <span>
             Window {formatTime(group.timeWindowStart)} –{" "}
@@ -222,48 +353,45 @@ export default function GroupCard({ group, onJoined }: GroupCardProps) {
           </span>
         </div>
         {group.campusLeaveTime && group.transportDepartureTime && (
-          <div className="flex items-center gap-1.5 col-span-2 text-xs text-gray-500">
-            Leave campus ~{formatTime(group.campusLeaveTime)} · Transport ~{" "}
-            {formatTime(group.transportDepartureTime)}
+          <div className="flex items-start gap-1.5 sm:col-span-2 text-xs text-gray-500">
+            <Navigation size={14} className="text-brand shrink-0 mt-0.5" />
+            <span>
+              Leave campus ~{formatTime(group.campusLeaveTime)} · Transport ~{" "}
+              {formatTime(group.transportDepartureTime)}
+            </span>
           </div>
         )}
-
-        {group.trainNumber && (
-          <div className="flex items-center gap-1.5">
-            <Train size={14} className="text-brand shrink-0" />
-            <span>Train {group.trainNumber}</span>
-          </div>
-        )}
-
         <div className="flex items-center gap-1.5">
           <Luggage size={14} className="text-brand shrink-0" />
           <span>{group.luggage}</span>
         </div>
-
         <div className="flex items-center gap-1.5">
           <ShieldCheck size={14} className="text-brand shrink-0" />
           <span>{group.genderPreference}</span>
         </div>
-
-        <div className="flex items-center gap-1.5">
-          <Navigation size={14} className="text-brand shrink-0" />
-          <span>{group.meetupPoint}</span>
+        <div className="flex items-center gap-1.5 sm:col-span-2">
+          <MapPin size={14} className="text-brand shrink-0" />
+          <span>Meetup: {group.meetupPoint}</span>
         </div>
+        {group.createdAt && (
+          <div className="flex items-center gap-1.5 sm:col-span-2 text-xs text-gray-400">
+            <Hash size={12} />
+            Listed {formatDateTime(group.createdAt)}
+          </div>
+        )}
       </div>
 
-      <div className="mb-3">
-        <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${
-              isFull ? "bg-red-500" : "bg-brand"
-            }`}
-            style={{ width: `${(seatsFilled / totalSeats) * 100}%` }}
-          />
-        </div>
+      <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${
+            isFull ? "bg-red-500" : "bg-brand"
+          }`}
+          style={{ width: `${(seatsFilled / totalSeats) * 100}%` }}
+        />
       </div>
 
       {isCreator && group.status === "Open" && pendingCount > 0 && (
-        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2">
+        <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2">
           <button
             type="button"
             onClick={() => setRequestsOpen((o) => !o)}
@@ -292,9 +420,14 @@ export default function GroupCard({ group, onJoined }: GroupCardProps) {
                       key={uid}
                       className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/80 px-2 py-2"
                     >
-                      <span className="text-sm text-gray-800">
-                        {displayNameForPending(p)}
-                      </span>
+                      <div className="text-sm text-gray-800 min-w-0">
+                        <p className="font-medium">{displayNameForPending(p)}</p>
+                        {p.message ? (
+                          <p className="text-xs text-gray-500 truncate">
+                            “{p.message}”
+                          </p>
+                        ) : null}
+                      </div>
                       <div className="flex gap-1">
                         <button
                           type="button"
@@ -325,6 +458,7 @@ export default function GroupCard({ group, onJoined }: GroupCardProps) {
       )}
 
       <button
+        type="button"
         onClick={handleRequestJoin}
         disabled={joining || !canRequest}
         className={`w-full rounded-xl py-2.5 text-sm font-semibold transition-all ${
@@ -342,19 +476,19 @@ export default function GroupCard({ group, onJoined }: GroupCardProps) {
         {joining ? (
           <Loader2 size={16} className="mx-auto animate-spin" />
         ) : isMember ? (
-          "✓ You're In"
+          "✓ You're in this ride"
         ) : isCreator ? (
-          "You're hosting"
+          "You're hosting this ride"
         ) : hasPending ? (
-          "Request sent"
+          "Join request pending"
         ) : isFull || group.status !== "Open" ? (
           group.status !== "Open"
-            ? `Not accepting requests (${group.status})`
+            ? `Join closed (${group.status})`
             : "Full"
         ) : (
           <span className="flex items-center justify-center gap-1.5">
             <UserPlus size={15} />
-            Request to Join
+            Request to join
           </span>
         )}
       </button>

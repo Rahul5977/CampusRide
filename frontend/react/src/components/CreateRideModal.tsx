@@ -80,7 +80,7 @@ export default function CreateRideModal({ open, onClose, onCreated }: Props) {
       const payload: Record<string, unknown> = {
         destination,
         transportType,
-        departureDate: new Date(departureDate).toISOString(),
+        departureDate: new Date(`${departureDate}T12:00:00`).toISOString(),
         timeWindowStart,
         timeWindowEnd,
         campusLeaveTime,

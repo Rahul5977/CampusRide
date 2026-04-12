@@ -5,6 +5,8 @@
  *   /              → LoginPage (public)
  *   /dashboard     → DashboardPage (protected — also handles OAuth callback)
  *   /my-rides      → MyRidesPage (protected)
+ *   /search        → SearchPage (protected)
+ *   /profile       → ProfilePage (protected)
  *   *              → redirect to /
  * ----------------------------------------------------------------------- */
 
@@ -14,6 +16,8 @@ import { ToastProvider } from "@/context/ToastContext";
 import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
 import MyRidesPage from "@/pages/MyRidesPage";
+import ProfilePage from "@/pages/ProfilePage";
+import SearchPage from "@/pages/SearchPage";
 import ProtectedLayout from "@/layouts/ProtectedLayout";
 
 export default function App() {
@@ -28,7 +32,9 @@ export default function App() {
             {/* Protected — all children share Navbar + auth guard */}
             <Route element={<ProtectedLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/search" element={<SearchPage />} />
               <Route path="/my-rides" element={<MyRidesPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
             </Route>
 
             {/* Catch-all */}

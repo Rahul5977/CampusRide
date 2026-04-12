@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Group from "../models/groups.model.js";
 import TravelPlan from "../models/travelPlan.model.js";
+import { startOfUtcDay } from "../utils/dateUtils.js";
 
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -129,7 +130,7 @@ export const getGroups = async (req, res) => {
       if (trainNumber) filter.trainNumber = trainNumber;
       if (trainName) filter.trainName = new RegExp(trainName, "i");
       if (status) filter.status = status;
-      else filter.status = { $in: ["Open", "Full"] };
+      else filter.status = { $in: ["Open", "Full", "Created"] };
 
       if (date) {
         const d = new Date(date);
@@ -137,12 +138,14 @@ export const getGroups = async (req, res) => {
         next.setUTCDate(next.getUTCDate() + 1);
         filter.departureDate = { $gte: d, $lt: next };
       } else {
-        filter.departureDate = { $gte: new Date() };
+        // Include all of "today" UTC — instant `new Date()` hides same-day rides at midnight UTC.
+        filter.departureDate = { $gte: startOfUtcDay() };
       }
     }
 
     const groups = await Group.find(filter)
-      .populate("creator", "name avatar")
+      .populate("creator", "name avatar email phone gender hostel year branch")
+      .populate("members", "name avatar email phone gender hostel year branch")
       .populate("pendingRequests.userId", "name avatar email")
       .sort({ departureDate: 1 });
 

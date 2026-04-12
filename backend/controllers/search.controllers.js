@@ -1,5 +1,6 @@
 import Group from "../models/groups.model.js";
 import TravelPlan from "../models/travelPlan.model.js";
+import { startOfUtcDay } from "../utils/dateUtils.js";
 
 function parseDateStart(d) {
   if (!d) return null;
@@ -33,7 +34,7 @@ export const searchGroups = async (req, res) => {
     } else if (to) {
       filter.departureDate = { $lte: to };
     } else {
-      filter.departureDate = { $gte: new Date() };
+      filter.departureDate = { $gte: startOfUtcDay() };
     }
 
     if (destination) filter.destination = destination;
@@ -43,7 +44,9 @@ export const searchGroups = async (req, res) => {
       filter.$text = { $search: q.trim() };
     }
 
-    let mongoQuery = Group.find(filter).populate("creator", "name avatar");
+    let mongoQuery = Group.find(filter)
+      .populate("creator", "name avatar email phone gender hostel year branch")
+      .populate("members", "name avatar email phone gender hostel year branch");
 
     if (q && q.trim()) {
       mongoQuery = mongoQuery

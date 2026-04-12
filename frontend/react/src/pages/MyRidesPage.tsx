@@ -10,7 +10,13 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import EmptyState from "@/components/EmptyState";
 import Spinner from "@/components/Spinner";
-import { formatDate, formatTime, membersContain } from "@/lib/utils";
+import {
+  formatDate,
+  formatTime,
+  membersContain,
+  creatorIdFromGroup,
+  groupStatusBadgeClass,
+} from "@/lib/utils";
 import api from "@/lib/api";
 import type { Group, User, GroupStatus } from "@/types";
 import {
@@ -33,27 +39,6 @@ const ACTIVE_STATUSES: GroupStatus[] = [
   "Locked",
   "Booking",
 ];
-
-function statusBadgeClass(status: GroupStatus): string {
-  switch (status) {
-    case "Open":
-      return "bg-emerald-100 text-emerald-700";
-    case "Full":
-      return "bg-amber-100 text-amber-700";
-    case "Locked":
-    case "Booking":
-      return "bg-sky-100 text-sky-800";
-    case "Created":
-      return "bg-violet-100 text-violet-800";
-    case "Departed":
-    case "Completed":
-      return "bg-gray-100 text-gray-600";
-    case "Cancelled":
-      return "bg-red-100 text-red-700";
-    default:
-      return "bg-gray-100 text-gray-500";
-  }
-}
 
 export default function MyRidesPage() {
   const { user } = useAuth();
@@ -157,7 +142,8 @@ export default function MyRidesPage() {
               typeof g.creator === "object"
                 ? (g.creator as Pick<User, "_id" | "name" | "avatar">)
                 : null;
-            const isCreator = user && creator?._id === user._id;
+            const isCreator =
+              !!user && creatorIdFromGroup(g.creator) === user._id;
             const canCancel = isCreator && g.status === "Open";
 
             return (
@@ -171,6 +157,18 @@ export default function MyRidesPage() {
                       <MapPin size={15} className="text-brand shrink-0" />
                       {g.destination}
                     </p>
+                    {creator?.name && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Host: <span className="font-medium">{creator.name}</span>
+                      </p>
+                    )}
+                    {(g.transportType || g.trainName) && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        {g.transportType ?? "Train"}
+                        {g.trainNumber ? ` · #${g.trainNumber}` : ""}
+                        {g.trainName ? ` · ${g.trainName}` : ""}
+                      </p>
+                    )}
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
                       <span className="flex items-center gap-1">
                         <Clock size={13} />
@@ -196,7 +194,7 @@ export default function MyRidesPage() {
 
                   <div className="flex flex-col items-end gap-2 shrink-0">
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(g.status)}`}
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${groupStatusBadgeClass(g.status)}`}
                     >
                       {g.status}
                     </span>
