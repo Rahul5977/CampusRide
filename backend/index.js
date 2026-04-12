@@ -45,23 +45,34 @@ app.use(
 app.use(express.json({ limit: "1mb" }));
 
 // ---------------------------------------------------------------------------
-// NEW: Serverless Database Connection Logic
+// Serverless-safe MongoDB connection (survives Lambda freeze / warm reuse)
 // ---------------------------------------------------------------------------
+/** Persists across warm Lambda invocations within the same container. */
+let isConnected = false;
+
 const connectDB = async () => {
-  // If connection is already active, reuse it (crucial for serverless)
-  if (mongoose.connection.readyState === 1) {
+  // Clear stale flag when the driver is not connected (e.g. Lambda froze an idle socket).
+  if (mongoose.connection.readyState !== 1) {
+    isConnected = false;
+  }
+
+  if (isConnected) {
+    console.log("Reusing existing connection");
     return;
   }
-  
+
   try {
     console.log("=> Creating new database connection...");
     await mongoose.connect(process.env.MONGO_URL, {
       serverSelectionTimeoutMS: 5000,
-      maxPoolSize: 10, // Prevents Lambda from overwhelming MongoDB connections
+      maxPoolSize: 10,
+      socketTimeoutMS: 45000,
     });
+    isConnected = mongoose.connections[0].readyState === 1;
     console.log("✅ Connected to MongoDB");
   } catch (err) {
     console.error("❌ MongoDB connection error:", err);
+    isConnected = false;
     throw err;
   }
 };
