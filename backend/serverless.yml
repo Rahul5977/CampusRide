@@ -1,10 +1,12 @@
 # CampusRide — HTTP API (Express + serverless-http), WebSocket API (chat),
 # DynamoDB (connections + messages), S3 (media uploads via presigned URLs).
-# Set secrets in `.env` (loaded by serverless-dotenv-plugin) before deploy.
+# Set secrets in `.env` — `useDotenv` + serverless-dotenv-plugin load before variable resolution.
 
 service: campus-transit-api
 
 frameworkVersion: "3"
+
+useDotenv: true
 
 provider:
   name: aws
