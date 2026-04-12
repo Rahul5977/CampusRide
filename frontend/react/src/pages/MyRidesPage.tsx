@@ -1,8 +1,8 @@
 /* -----------------------------------------------------------------------
  * MyRidesPage — shows rides the user has created or joined.
  *
- * Two tabs: "Active" (upcoming) and "Past" (departed / cancelled / full).
- * Allows the creator to cancel (delete) a group.
+ * Tabs: "Active" (upcoming operational states) and "Past".
+ * Creator can cancel (delete) a group only while status is Open.
  * ----------------------------------------------------------------------- */
 
 import { useState, useEffect, useCallback } from "react";
@@ -10,9 +10,9 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import EmptyState from "@/components/EmptyState";
 import Spinner from "@/components/Spinner";
-import { formatDate, formatTime } from "@/lib/utils";
+import { formatDate, formatTime, membersContain } from "@/lib/utils";
 import api from "@/lib/api";
-import type { Group, User } from "@/types";
+import type { Group, User, GroupStatus } from "@/types";
 import {
   Route,
   Clock,
@@ -26,6 +26,35 @@ import {
 
 type Tab = "active" | "past";
 
+const ACTIVE_STATUSES: GroupStatus[] = [
+  "Created",
+  "Open",
+  "Full",
+  "Locked",
+  "Booking",
+];
+
+function statusBadgeClass(status: GroupStatus): string {
+  switch (status) {
+    case "Open":
+      return "bg-emerald-100 text-emerald-700";
+    case "Full":
+      return "bg-amber-100 text-amber-700";
+    case "Locked":
+    case "Booking":
+      return "bg-sky-100 text-sky-800";
+    case "Created":
+      return "bg-violet-100 text-violet-800";
+    case "Departed":
+    case "Completed":
+      return "bg-gray-100 text-gray-600";
+    case "Cancelled":
+      return "bg-red-100 text-red-700";
+    default:
+      return "bg-gray-100 text-gray-500";
+  }
+}
+
 export default function MyRidesPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -37,7 +66,7 @@ export default function MyRidesPage() {
   const loadGroups = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/groups");
+      const { data } = await api.get("/groups", { params: { mine: "true" } });
       setGroups(data.groups ?? []);
     } catch {
       setGroups([]);
@@ -50,21 +79,19 @@ export default function MyRidesPage() {
     loadGroups();
   }, [loadGroups]);
 
-  // Filter to groups this user is a member of
-  const myGroups = groups.filter((g) => user && g.members.includes(user._id));
+  const myGroups = groups.filter(
+    (g) => user && membersContain(g.members, user._id),
+  );
 
   const now = new Date();
-  const active = myGroups.filter(
-    (g) =>
-      (g.status === "Open" || g.status === "Full") &&
-      new Date(g.departureDate) >= now,
-  );
-  const past = myGroups.filter(
-    (g) =>
-      g.status === "Departed" ||
-      g.status === "Cancelled" ||
-      new Date(g.departureDate) < now,
-  );
+
+  const active = myGroups.filter((g) => {
+    const upcomingDay = new Date(g.departureDate) >= now;
+    return ACTIVE_STATUSES.includes(g.status) && upcomingDay;
+  });
+
+  const activeIds = new Set(active.map((g) => g._id));
+  const past = myGroups.filter((g) => !activeIds.has(g._id));
 
   const displayed = tab === "active" ? active : past;
 
@@ -93,7 +120,6 @@ export default function MyRidesPage() {
         My Rides
       </h1>
 
-      {/* Tabs */}
       <div className="flex gap-1 rounded-xl bg-gray-100 p-1 mb-6">
         {(["active", "past"] as Tab[]).map((t) => (
           <button
@@ -132,6 +158,7 @@ export default function MyRidesPage() {
                 ? (g.creator as Pick<User, "_id" | "name" | "avatar">)
                 : null;
             const isCreator = user && creator?._id === user._id;
+            const canCancel = isCreator && g.status === "Open";
 
             return (
               <div
@@ -167,26 +194,19 @@ export default function MyRidesPage() {
                     </div>
                   </div>
 
-                  {/* Status badge + delete button */}
                   <div className="flex flex-col items-end gap-2 shrink-0">
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        g.status === "Open"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : g.status === "Full"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-gray-100 text-gray-500"
-                      }`}
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(g.status)}`}
                     >
                       {g.status}
                     </span>
 
-                    {isCreator && tab === "active" && (
+                    {canCancel && tab === "active" && (
                       <button
                         onClick={() => handleDelete(g._id)}
                         disabled={deletingId === g._id}
                         className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                        title="Cancel this ride"
+                        title="Cancel this ride (Open only)"
                       >
                         {deletingId === g._id ? (
                           <Loader2 size={15} className="animate-spin" />

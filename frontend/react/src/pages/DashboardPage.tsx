@@ -3,7 +3,7 @@
  *
  * 1. On mount: checks for ?token= in the URL (OAuth callback), saves it,
  *    cleans the URL, and triggers user fetch.
- * 2. Fetches open groups with optional destination + date filters.
+ * 2. Fetches groups with optional destination + date filters (server-side).
  * 3. Renders a sticky filter bar + a feed of GroupCards.
  * ----------------------------------------------------------------------- */
 
@@ -31,26 +31,21 @@ export default function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [tokenProcessed, setTokenProcessed] = useState(false);
 
-  // ---- OAuth callback token extraction ----
   useEffect(() => {
     const token = searchParams.get("token");
     if (token && !tokenProcessed) {
       localStorage.setItem("ct_token", token);
-      // Strip the token from the URL to prevent leakage via Referer header
       setSearchParams({}, { replace: true });
       fetchUser();
       setTokenProcessed(true);
     } else if (!token && !tokenProcessed) {
-      // No token in URL, mark as processed
       setTokenProcessed(true);
     }
   }, [searchParams, tokenProcessed, setSearchParams, fetchUser]);
 
-  // ---- Filter state ----
   const [filterDest, setFilterDest] = useState<Destination | "All">("All");
   const [filterDate, setFilterDate] = useState("");
 
-  // ---- Data state ----
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -58,35 +53,26 @@ export default function DashboardPage() {
   const loadGroups = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/groups");
+      const params: Record<string, string> = {};
+      if (filterDest !== "All") params.destination = filterDest;
+      if (filterDate) params.date = filterDate;
+      const { data } = await api.get("/groups", { params });
       setGroups(data.groups ?? []);
     } catch {
       setGroups([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filterDest, filterDate]);
 
   useEffect(() => {
     loadGroups();
   }, [loadGroups]);
 
-  // ---- Apply client-side filters ----
-  const filtered = groups.filter((g) => {
-    if (filterDest !== "All" && g.destination !== filterDest) return false;
-    if (filterDate) {
-      const groupDate = new Date(g.departureDate).toISOString().split("T")[0];
-      if (groupDate !== filterDate) return false;
-    }
-    return true;
-  });
-
   return (
     <div className="mx-auto max-w-5xl px-4 pb-24">
-      {/* ---- Sticky filter bar ---- */}
       <div className="sticky top-14 z-30 glass -mx-4 border-b border-border px-4 py-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-          {/* Destination pills */}
           <div className="flex flex-wrap gap-1.5">
             {DESTINATIONS.map((d) => (
               <button
@@ -103,7 +89,6 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          {/* Date filter */}
           <input
             type="date"
             value={filterDate}
@@ -123,11 +108,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ---- Content ---- */}
       <div className="mt-4">
         {loading ? (
           <Spinner />
-        ) : filtered.length === 0 ? (
+        ) : groups.length === 0 ? (
           <EmptyState
             icon={<Search size={48} />}
             title="No rides found"
@@ -148,14 +132,13 @@ export default function DashboardPage() {
           />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
-            {filtered.map((group) => (
+            {groups.map((group) => (
               <GroupCard key={group._id} group={group} onJoined={loadGroups} />
             ))}
           </div>
         )}
       </div>
 
-      {/* ---- FAB — create ride ---- */}
       <button
         onClick={() => setCreateOpen(true)}
         className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-white shadow-xl shadow-brand/30 hover:bg-brand-dark active:scale-95 transition-all sm:hidden"
@@ -164,7 +147,6 @@ export default function DashboardPage() {
         <Plus size={24} />
       </button>
 
-      {/* Desktop CTA in header area (visible only on sm+) */}
       <button
         onClick={() => setCreateOpen(true)}
         className="fixed bottom-6 right-6 z-40 hidden items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-brand/30 hover:bg-brand-dark active:scale-[0.98] transition-all sm:inline-flex"
@@ -173,7 +155,6 @@ export default function DashboardPage() {
         Create a Ride
       </button>
 
-      {/* ---- Create Ride Modal ---- */}
       <CreateRideModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}

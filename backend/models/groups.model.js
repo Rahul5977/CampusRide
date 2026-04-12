@@ -1,5 +1,43 @@
 import mongoose from "mongoose";
 
+const DESTINATION_ENUM = [
+  "Durg Junction",
+  "Raipur Station",
+  "Swami Vivekananda Airport",
+];
+
+const MEETUP_ENUM = [
+  "Gate 1",
+  "Gate 2",
+  "Kanhar Parking",
+  "Mess Parking",
+  "Other",
+];
+
+const GROUP_STATUS_ENUM = [
+  "Created",
+  "Open",
+  "Full",
+  "Locked",
+  "Booking",
+  "Departed",
+  "Completed",
+  "Cancelled",
+];
+
+const pendingRequestSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    message: { type: String, maxlength: 500, default: "" },
+    requestedAt: { type: Date, default: Date.now },
+  },
+  { _id: false },
+);
+
 const groupSchema = new mongoose.Schema(
   {
     creator: {
@@ -7,22 +45,33 @@ const groupSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    travelPlanId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "TravelPlan",
+    },
     destination: {
       type: String,
       required: true,
-      enum: ["Durg Junction", "Raipur Station", "Swami Vivekananda Airport"],
+      enum: DESTINATION_ENUM,
     },
+    transportType: {
+      type: String,
+      enum: ["Train", "Flight"],
+      required: true,
+    },
+    trainNumber: { type: String, trim: true },
+    trainName: { type: String, trim: true },
+    flightNumber: { type: String, trim: true },
     meetupPoint: {
       type: String,
-      enum: ["Gate 1", "Gate 2", "Kanhar Parking", "Mess Parking", "Other"],
+      enum: MEETUP_ENUM,
       default: "Gate 2",
     },
-    trainNumber: { type: String },
-
     departureDate: { type: Date, required: true },
+    transportDepartureTime: { type: Date, required: true },
+    campusLeaveTime: { type: Date, required: true },
     timeWindowStart: { type: Date, required: true },
     timeWindowEnd: { type: Date, required: true },
-
     genderPreference: {
       type: String,
       enum: ["Any", "Same Gender Only"],
@@ -33,9 +82,7 @@ const groupSchema = new mongoose.Schema(
       enum: ["Light (Backpacks)", "Heavy (Trolleys)"],
       required: true,
     },
-
-    // Capacity tracking
-    capacity: { type: Number, default: 4 },
+    capacity: { type: Number, default: 5 },
     currentMembers: { type: Number, default: 1 },
     members: [
       {
@@ -43,17 +90,18 @@ const groupSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
-
+    pendingRequests: [pendingRequestSchema],
     status: {
       type: String,
-      enum: ["Open", "Full", "Departed", "Cancelled"],
+      enum: GROUP_STATUS_ENUM,
       default: "Open",
     },
   },
   { timestamps: true },
 );
 
-// Ensures rapid searching during high-traffic spikes
 groupSchema.index({ destination: 1, departureDate: 1, status: 1 });
+groupSchema.index({ trainNumber: 1 });
+groupSchema.index({ trainName: "text" });
 
 export default mongoose.model("Group", groupSchema);

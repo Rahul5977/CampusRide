@@ -41,3 +41,23 @@ export function toInputDate(date: Date): string {
 export function toInputTime(date: Date): string {
   return date.toTimeString().slice(0, 5);
 }
+
+/** Normalize a populated or raw member id from a group `members` array. */
+export function memberUserId(ref: string | { _id: string }): string {
+  return typeof ref === "string" ? ref : ref._id;
+}
+
+export function membersContain(
+  members: (string | { _id: string })[],
+  userId: string,
+): boolean {
+  return members.some((m) => memberUserId(m) === userId);
+}
+
+export function pendingRequestForUser(
+  pending: { userId: string | { _id: string } }[] | undefined,
+  userId: string,
+): boolean {
+  if (!pending?.length) return false;
+  return pending.some((p) => memberUserId(p.userId) === userId);
+}

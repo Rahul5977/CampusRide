@@ -1,6 +1,5 @@
 /* -----------------------------------------------------------------------
- * Shared TypeScript types — mirrors the backend Mongoose schemas exactly.
- * Any change to the backend enums MUST be reflected here.
+ * Shared TypeScript types — mirrors the backend Mongoose schemas.
  * ----------------------------------------------------------------------- */
 
 export interface User {
@@ -17,6 +16,8 @@ export interface User {
     | "Indravati (GH1)"
     | "Shivnath (MSH)"
     | "Day Scholar";
+  year?: string;
+  branch?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,22 +38,48 @@ export type LuggageType = "Light (Backpacks)" | "Heavy (Trolleys)";
 
 export type GenderPreference = "Any" | "Same Gender Only";
 
-export type GroupStatus = "Open" | "Full" | "Departed" | "Cancelled";
+export type TransportType = "Train" | "Flight";
+
+export type GroupStatus =
+  | "Created"
+  | "Open"
+  | "Full"
+  | "Locked"
+  | "Booking"
+  | "Departed"
+  | "Completed"
+  | "Cancelled";
+
+export type MemberRef = string | Pick<User, "_id" | "name" | "avatar">;
+
+export interface PendingRequest {
+  userId: MemberRef;
+  message?: string;
+  requestedAt?: string;
+}
 
 export interface Group {
   _id: string;
   creator: Pick<User, "_id" | "name" | "avatar"> | string;
+  travelPlanId?: string;
   destination: Destination;
+  /** Present on groups created with the new API; optional for older documents. */
+  transportType?: TransportType;
   meetupPoint: MeetupPoint;
   trainNumber?: string;
+  trainName?: string;
+  flightNumber?: string;
   departureDate: string;
+  transportDepartureTime?: string;
+  campusLeaveTime?: string;
   timeWindowStart: string;
   timeWindowEnd: string;
   genderPreference: GenderPreference;
   luggage: LuggageType;
   capacity: number;
   currentMembers: number;
-  members: string[];
+  members: MemberRef[];
+  pendingRequests?: PendingRequest[];
   status: GroupStatus;
   createdAt: string;
   updatedAt: string;
@@ -65,4 +92,24 @@ export interface ApiResponse<T> {
   groups?: T[];
   group?: T;
   user?: User;
+}
+
+export interface TravelPlan {
+  _id: string;
+  userId: string;
+  label?: string;
+  destination: Destination;
+  transportType: TransportType;
+  trainNumber?: string;
+  trainName?: string;
+  flightNumber?: string;
+  departureDate: string;
+  departureTime: string;
+  campusLeaveTime: string;
+  meetupPoint: MeetupPoint;
+  status: "Upcoming" | "Completed" | "Cancelled";
+  isTemplate?: boolean;
+  visibility: "private" | "public";
+  createdAt: string;
+  updatedAt: string;
 }

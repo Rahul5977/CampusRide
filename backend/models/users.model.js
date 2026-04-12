@@ -11,10 +11,10 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
-    googleId: { type: String, required: true, unique: true }, // OAuth
+    googleId: { type: String, required: true, unique: true },
     avatar: { type: String },
     phone: { type: String },
-    gender: { type: String, enum: ["Male", "Female", "Other"] }, // Collected after OAuth sign-up
+    gender: { type: String, enum: ["Male", "Female", "Other"] },
     hostel: {
       type: String,
       enum: [
@@ -24,8 +24,9 @@ const userSchema = new mongoose.Schema(
         "Shivnath (MSH)",
         "Day Scholar",
       ],
-      // Collected after OAuth sign-up
     },
+    year: { type: String, trim: true, maxlength: 32 },
+    branch: { type: String, trim: true, maxlength: 64 },
   },
   { timestamps: true },
 );

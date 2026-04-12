@@ -1,26 +1,151 @@
-# backend/serverless.yml
+# CampusRide — HTTP API (Express + serverless-http), WebSocket API (chat),
+# DynamoDB (connections + messages), S3 (media uploads via presigned URLs).
+# Set secrets in `.env` (loaded by serverless-dotenv-plugin) before deploy.
 
-service: campus-transit-api # The name of your project in AWS
+service: campus-transit-api
+
+frameworkVersion: "3"
 
 provider:
   name: aws
   runtime: nodejs20.x
-  region: ap-south-1 # Mumbai region (closest to Chhattisgarh for lowest latency)
-  stage: dev
-  memorySize: 512 # 512MB is plenty for an Express app
-  timeout: 10 # If a request takes longer than 10 seconds, timeout
+  region: ap-south-1
+  stage: ${opt:stage, 'dev'}
+  memorySize: 512
+  timeout: 29
   environment:
-    # We pass the environment variables from your local .env to AWS here
+    NODE_ENV: production
     MONGO_URL: ${env:MONGO_URL}
+    JWT_SECRET: ${env:JWT_SECRET}
+    JWT_EXPIRES_IN: ${env:JWT_EXPIRES_IN, '7d'}
     FRONTEND_URL: ${env:FRONTEND_URL}
+    GOOGLE_CLIENT_ID: ${env:GOOGLE_CLIENT_ID}
+    GOOGLE_CLIENT_SECRET: ${env:GOOGLE_CLIENT_SECRET}
+    GOOGLE_CALLBACK_URL: ${env:GOOGLE_CALLBACK_URL}
+    CONNECTIONS_TABLE: !Ref ConnectionsTable
+    MESSAGES_TABLE: !Ref MessagesTable
+    MEDIA_BUCKET: !Ref MediaBucket
+
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:AbortMultipartUpload
+          Resource: !Sub "${MediaBucket.Arn}/*"
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+          Resource:
+            - !GetAtt ConnectionsTable.Arn
+            - !Sub "${ConnectionsTable.Arn}/index/*"
+            - !GetAtt MessagesTable.Arn
+        - Effect: Allow
+          Action:
+            - execute-api:ManageConnections
+          Resource: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*/*/@connections/*"
 
 functions:
   api:
-    handler: index.handler # Points to the "export const handler" in your index.js
+    handler: index.handler
+    description: Express REST API (MongoDB Atlas)
     events:
       - httpApi:
-          path: '*' # Catch all routes (e.g., /api/groups, /api/auth)
-          method: '*' # Catch all methods (GET, POST, PUT, DELETE)
+          path: '*'
+          method: '*'
+
+  wsConnect:
+    handler: handlers/ws-connect.handler
+    description: WebSocket $connect — register connection in DynamoDB
+    events:
+      - websocket:
+          route: $connect
+
+  wsDisconnect:
+    handler: handlers/ws-disconnect.handler
+    description: WebSocket $disconnect — remove connection
+    events:
+      - websocket:
+          route: $disconnect
+
+  wsDefault:
+    handler: handlers/ws-default.handler
+    description: WebSocket $default — store + fan-out chat messages
+    events:
+      - websocket:
+          route: $default
 
 plugins:
-  - serverless-dotenv-plugin # This plugin automatically loads your local .env file
+  - serverless-dotenv-plugin
+
+resources:
+  Resources:
+    ConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:service}-${self:provider.stage}-connections
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+          - AttributeName: groupId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: byGroup
+            KeySchema:
+              - AttributeName: groupId
+                KeyType: HASH
+              - AttributeName: connectionId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+    MessagesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:service}-${self:provider.stage}-messages
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+          - AttributeName: sk
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+          - AttributeName: sk
+            KeyType: RANGE
+
+    MediaBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - "*"
+              AllowedMethods:
+                - PUT
+                - HEAD
+              AllowedOrigins:
+                - "*"
+              MaxAge: 3000
+
+  Outputs:
+    MediaBucketName:
+      Value: !Ref MediaBucket
+    ConnectionsTableName:
+      Value: !Ref ConnectionsTable
+    MessagesTableName:
+      Value: !Ref MessagesTable

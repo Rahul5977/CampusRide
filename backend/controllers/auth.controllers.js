@@ -11,7 +11,7 @@
  *     3. Find-or-create user in MongoDB
  *     4. Sign a JWT and redirect to the frontend with the token
  *   GET  /api/auth/me              → return the authenticated user's profile
- *   PATCH /api/auth/profile        → update profile fields (phone, gender, hostel)
+ *   PATCH /api/auth/profile        → update profile fields (phone, gender, hostel, year, branch)
  *
  * SECURITY NOTES:
  *   • The domain check is performed on the **verified** id_token payload
@@ -151,7 +151,7 @@ export const updateProfile = async (req, res) => {
   try {
     // Whitelist only the fields we allow users to update.
     // This prevents mass-assignment attacks (e.g. overwriting `googleId`).
-    const allowedFields = ["phone", "gender", "hostel"];
+    const allowedFields = ["phone", "gender", "hostel", "year", "branch"];
     const updates = {};
 
     for (const field of allowedFields) {

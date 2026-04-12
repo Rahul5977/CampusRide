@@ -21,6 +21,9 @@ import ServerlessHttp from "serverless-http";
 // ---- Route imports ----
 import authRoutes from "./routes/auth.routes.js";
 import groupRoutes from "./routes/group.routes.js";
+import userRoutes from "./routes/user.routes.js";
+import searchRoutes from "./routes/search.routes.js";
+import mediaRoutes from "./routes/media.routes.js";
 
 // 1. Load environment variables FIRST
 dotenv.config();
@@ -77,6 +80,9 @@ app.use(async (req, res, next) => {
 // 5. Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/groups", groupRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/search", searchRoutes);
+app.use("/api/media", mediaRoutes);
 
 // Health-check endpoint
 app.get("/api/health", (_req, res) => {

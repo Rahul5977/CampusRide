@@ -12,6 +12,7 @@ import type {
   MeetupPoint,
   LuggageType,
   GenderPreference,
+  TransportType,
 } from "@/types";
 import { toInputDate } from "@/lib/utils";
 
@@ -42,13 +43,17 @@ const LUGGAGE_OPTIONS: LuggageType[] = [
 
 const GENDER_OPTIONS: GenderPreference[] = ["Any", "Same Gender Only"];
 
+const TRANSPORT: TransportType[] = ["Train", "Flight"];
+
 export default function CreateRideModal({ open, onClose, onCreated }: Props) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
-  // Form state
   const [destination, setDestination] = useState<Destination>("Durg Junction");
+  const [transportType, setTransportType] = useState<TransportType>("Train");
   const [trainNumber, setTrainNumber] = useState("");
+  const [trainName, setTrainName] = useState("");
+  const [flightNumber, setFlightNumber] = useState("");
   const [departureDate, setDepartureDate] = useState(toInputDate(new Date()));
   const [timeStart, setTimeStart] = useState("16:00");
   const [timeEnd, setTimeEnd] = useState("17:00");
@@ -62,7 +67,6 @@ export default function CreateRideModal({ open, onClose, onCreated }: Props) {
     setLoading(true);
 
     try {
-      // Combine date + time into ISO strings
       const timeWindowStart = new Date(
         `${departureDate}T${timeStart}:00`,
       ).toISOString();
@@ -70,16 +74,29 @@ export default function CreateRideModal({ open, onClose, onCreated }: Props) {
         `${departureDate}T${timeEnd}:00`,
       ).toISOString();
 
-      await api.post("/groups", {
+      const campusLeaveTime = timeWindowStart;
+      const transportDepartureTime = timeWindowEnd;
+
+      const payload: Record<string, unknown> = {
         destination,
-        trainNumber: trainNumber || undefined,
+        transportType,
         departureDate: new Date(departureDate).toISOString(),
         timeWindowStart,
         timeWindowEnd,
+        campusLeaveTime,
+        transportDepartureTime,
         luggage,
         genderPreference,
         meetupPoint,
-      });
+      };
+
+      if (trainNumber.trim()) payload.trainNumber = trainNumber.trim();
+      if (trainName.trim()) payload.trainName = trainName.trim();
+      if (transportType === "Flight" && flightNumber.trim()) {
+        payload.flightNumber = flightNumber.trim();
+      }
+
+      await api.post("/groups", payload);
 
       toast({ title: "Ride created! 🎉", variant: "success" });
       onCreated();
@@ -99,18 +116,15 @@ export default function CreateRideModal({ open, onClose, onCreated }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Modal */}
       <form
         onSubmit={handleSubmit}
         className="relative w-full sm:max-w-lg bg-surface rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
       >
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <PlusCircle size={20} className="text-brand" />
@@ -126,7 +140,6 @@ export default function CreateRideModal({ open, onClose, onCreated }: Props) {
         </div>
 
         <div className="space-y-4">
-          {/* Destination */}
           <FieldLabel label="Destination">
             <select
               value={destination}
@@ -142,7 +155,23 @@ export default function CreateRideModal({ open, onClose, onCreated }: Props) {
             </select>
           </FieldLabel>
 
-          {/* Train Number */}
+          <FieldLabel label="Transport">
+            <select
+              value={transportType}
+              onChange={(e) =>
+                setTransportType(e.target.value as TransportType)
+              }
+              className="input-field"
+              required
+            >
+              {TRANSPORT.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </FieldLabel>
+
           <FieldLabel label="Train Number (optional)">
             <input
               type="text"
@@ -153,7 +182,28 @@ export default function CreateRideModal({ open, onClose, onCreated }: Props) {
             />
           </FieldLabel>
 
-          {/* Date */}
+          <FieldLabel label="Train Name (optional)">
+            <input
+              type="text"
+              value={trainName}
+              onChange={(e) => setTrainName(e.target.value)}
+              placeholder="e.g. Gondwana Express"
+              className="input-field"
+            />
+          </FieldLabel>
+
+          {transportType === "Flight" && (
+            <FieldLabel label="Flight Number (optional)">
+              <input
+                type="text"
+                value={flightNumber}
+                onChange={(e) => setFlightNumber(e.target.value)}
+                placeholder="e.g. 6E 123"
+                className="input-field"
+              />
+            </FieldLabel>
+          )}
+
           <FieldLabel label="Departure Date">
             <input
               type="date"
@@ -165,7 +215,11 @@ export default function CreateRideModal({ open, onClose, onCreated }: Props) {
             />
           </FieldLabel>
 
-          {/* Time window */}
+          <p className="text-xs text-gray-500 -mt-2">
+            Meet-up window on campus. Leave campus by the start time; train or
+            flight is expected around the end time.
+          </p>
+
           <div className="grid grid-cols-2 gap-3">
             <FieldLabel label="From">
               <input
@@ -187,7 +241,6 @@ export default function CreateRideModal({ open, onClose, onCreated }: Props) {
             </FieldLabel>
           </div>
 
-          {/* Luggage */}
           <FieldLabel label="Luggage">
             <select
               value={luggage}
@@ -202,7 +255,6 @@ export default function CreateRideModal({ open, onClose, onCreated }: Props) {
             </select>
           </FieldLabel>
 
-          {/* Gender Preference */}
           <FieldLabel label="Gender Preference">
             <select
               value={genderPreference}
@@ -219,7 +271,6 @@ export default function CreateRideModal({ open, onClose, onCreated }: Props) {
             </select>
           </FieldLabel>
 
-          {/* Meetup Point */}
           <FieldLabel label="Meetup Point">
             <select
               value={meetupPoint}
@@ -235,7 +286,6 @@ export default function CreateRideModal({ open, onClose, onCreated }: Props) {
           </FieldLabel>
         </div>
 
-        {/* Submit */}
         <button
           type="submit"
           disabled={loading}
@@ -252,7 +302,6 @@ export default function CreateRideModal({ open, onClose, onCreated }: Props) {
   );
 }
 
-/* Tiny helper for consistent field labels */
 function FieldLabel({
   label,
   children,

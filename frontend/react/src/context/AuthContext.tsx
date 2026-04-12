@@ -72,7 +72,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const needsOnboarding =
-    !!user && (!user.phone || !user.gender || !user.hostel);
+    !!user &&
+    (!user.phone ||
+      !user.gender ||
+      !user.hostel ||
+      !user.year?.trim() ||
+      !user.branch?.trim());
 
   return (
     <AuthContext.Provider

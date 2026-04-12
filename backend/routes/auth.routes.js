@@ -9,7 +9,7 @@
  *
  * Protected routes (Bearer token required):
  *   GET   /api/auth/me             → Get current user profile
- *   PATCH /api/auth/profile        → Update profile (phone, gender, hostel)
+ *   PATCH /api/auth/profile        → Update profile (phone, gender, hostel, year, branch)
  * ---------------------------------------------------------------------------
  */
 
